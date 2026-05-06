@@ -4,6 +4,10 @@ import { SearchEngine } from './search/engine'
 import { Indexer } from './search/indexer'
 import { IndexCache } from './search/cache'
 import { PropertySearchModal } from './ui/search-modal'
+import { HeadingsModal } from './ui/headings-modal'
+import { HeadingsInFileModal } from './ui/headings-infile-modal'
+import { BasesModal } from './ui/bases-modal'
+import { BookmarksModal } from './ui/bookmarks-modal'
 import { isFilePDF, isFileMarkdown, stripFrontmatter } from './tools/utils'
 
 export default class PropertySearchPlugin extends Plugin {
@@ -13,10 +17,7 @@ export default class PropertySearchPlugin extends Plugin {
   private indexer!: Indexer
   private cache!: IndexCache
 
-  /**
-   * In-memory store of document content, keyed by path.
-   * Used by the modal to extract match snippets without re-reading files.
-   */
+  /** In-memory document content store for snippet extraction. */
   private contentStore = new Map<string, string>()
 
   async onload(): Promise<void> {
@@ -28,17 +29,50 @@ export default class PropertySearchPlugin extends Plugin {
 
     this.addSettingTab(new PropertySearchSettingTab(this.app, this))
 
+    // ── Commands ─────────────────────────────────────────────────────────────
+
     this.addCommand({
       id: 'open-search',
       name: 'Open vault search',
+      hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'o' }],
       callback: () => {
-        new PropertySearchModal(
-          this.app,
-          this.engine,
-          this.indexer,
-          this.settings,
-          this.contentStore
-        ).open()
+        new PropertySearchModal(this.app, this.engine, this.indexer, this.settings, this.contentStore).open()
+      },
+    })
+
+    this.addCommand({
+      id: 'search-headings',
+      name: 'Search headings (vault)',
+      hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'h' }],
+      callback: () => {
+        new HeadingsModal(this.app).open()
+      },
+    })
+
+    this.addCommand({
+      id: 'search-headings-infile',
+      name: 'Search headings (current file)',
+      hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'j' }],
+      editorCallback: (_editor, _view) => {
+        new HeadingsInFileModal(this.app).open()
+      },
+    })
+
+    this.addCommand({
+      id: 'search-bases',
+      name: 'Search Bases files',
+      hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'b' }],
+      callback: () => {
+        new BasesModal(this.app).open()
+      },
+    })
+
+    this.addCommand({
+      id: 'search-bookmarks',
+      name: 'Search bookmarks',
+      hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'k' }],
+      callback: () => {
+        new BookmarksModal(this.app).open()
       },
     })
 
@@ -48,7 +82,8 @@ export default class PropertySearchPlugin extends Plugin {
       callback: () => this.reindex(),
     })
 
-    // Register vault event listeners for incremental updates
+    // ── Vault event listeners ────────────────────────────────────────────────
+
     this.registerEvent(
       this.app.vault.on('create', (file) => {
         if ('stat' in file && this.indexer.isIndexable(file.path)) {
@@ -61,6 +96,7 @@ export default class PropertySearchPlugin extends Plugin {
       this.app.vault.on('modify', (file) => {
         if ('stat' in file && this.indexer.isIndexable(file.path)) {
           this.indexer.flagDirty(file)
+          this.persistContent(file as any)
         }
       })
     )
@@ -83,12 +119,11 @@ export default class PropertySearchPlugin extends Plugin {
       })
     )
 
-    // Defer heavy indexing until layout is ready
     this.app.workspace.onLayoutReady(() => this.initIndex())
   }
 
   async onunload(): Promise<void> {
-    // Nothing to teardown explicitly — Plugin.unload handles event deregistration
+    // Plugin.unload handles event deregistration
   }
 
   async loadSettings(): Promise<void> {
@@ -99,7 +134,6 @@ export default class PropertySearchPlugin extends Plugin {
     await this.saveData(this.settings)
   }
 
-  /** Full reindex: clear cache, rebuild from scratch, save. */
   async reindex(): Promise<void> {
     new Notice('Property Search: reindexing vault…')
     this.engine.clear()
@@ -115,7 +149,6 @@ export default class PropertySearchPlugin extends Plugin {
     await this.buildContentStore()
     const loaded = await this.cache.load(this.engine)
     if (loaded) {
-      // Incremental update: reindex files that changed since last cache write
       await this.reconcileWithVault()
       await this.cache.save(this.engine)
     } else {
@@ -125,20 +158,15 @@ export default class PropertySearchPlugin extends Plugin {
   }
 
   private async reconcileWithVault(): Promise<void> {
-    // Build a map of path -> mtime from the vault
     const files = this.app.vault.getFiles().filter((f) => this.indexer.isIndexable(f.path))
     const vaultMtimes = new Map(files.map((f) => [f.path, f.stat.mtime]))
 
-    // Re-read cache mtime data by comparing vault vs content store
-    // (Simple approach: reindex any file whose content store is missing or mtime differs)
-    const toAdd = files.filter(
-      (f) => !this.contentStore.has(f.path)
-    )
+    const toAdd = files.filter((f) => !this.contentStore.has(f.path))
     for (const f of toAdd) {
       await this.indexer.indexFile(f)
       await this.persistContent(f)
     }
-    // Remove paths that no longer exist in vault
+
     for (const path of [...this.contentStore.keys()]) {
       if (!vaultMtimes.has(path)) {
         this.indexer.removeFile(path)
@@ -147,7 +175,6 @@ export default class PropertySearchPlugin extends Plugin {
     }
   }
 
-  /** Pre-populate contentStore by reading all vault files (for snippet extraction). */
   private async buildContentStore(): Promise<void> {
     const files = this.app.vault.getFiles().filter((f) => this.indexer.isIndexable(f.path))
     for (const file of files) {
@@ -155,14 +182,12 @@ export default class PropertySearchPlugin extends Plugin {
     }
   }
 
-  /** Read a file's content and store it in contentStore. */
   private async persistContent(file: any): Promise<void> {
     try {
       if (isFileMarkdown(file.path)) {
         const raw = await this.app.vault.cachedRead(file)
         this.contentStore.set(file.path, stripFrontmatter(raw))
       } else if (isFilePDF(file.path)) {
-        // PDF content populated lazily when extractor is available
         const existing = this.contentStore.get(file.path)
         if (!existing) this.contentStore.set(file.path, '')
       }

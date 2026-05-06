@@ -27,3 +27,20 @@ export interface ResultItem {
   frontmatter: Record<string, unknown> | null
   matchedContent: string
 }
+
+export interface HeadingItem {
+  file: import('obsidian').TFile
+  heading: string
+  level: number
+  line: number
+}
+
+export type BookmarkType = 'file' | 'folder' | 'heading' | 'block' | 'search' | 'graph' | 'url' | 'group'
+
+export interface BookmarkItem {
+  type: BookmarkType
+  title: string
+  path: string
+  subpath?: string
+  url?: string
+}

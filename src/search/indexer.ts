@@ -14,7 +14,12 @@ export class Indexer {
     for (const folder of this.settings.excludeFolders) {
       if (path.startsWith(folder.endsWith('/') ? folder : folder + '/')) return false
     }
-    return isFileMarkdown(path) || (this.settings.indexPdfs && isFilePDF(path))
+    const extra = this.settings.additionalExtensions ?? []
+    return (
+      isFileMarkdown(path) ||
+      (this.settings.indexPdfs && isFilePDF(path)) ||
+      extra.some((ext) => path.toLowerCase().endsWith('.' + ext.toLowerCase()))
+    )
   }
 
   flagDirty(file: TAbstractFile): void {

@@ -61,3 +61,23 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Heading level indicator (##, ###, etc.) */
+.ps-heading-level {
+  font-weight: 400;
+  opacity: 0.45;
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+  letter-spacing: -0.02em;
+}
+
+/* Badge shared by all modals */
+.ps-badge {
+  font-size: 0.7em;
+  font-weight: 400;
+  opacity: 0.6;
+  background: var(--background-modifier-border);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 4px;
+}

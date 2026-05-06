@@ -23,12 +23,11 @@ export class PropertySearchModal extends SuggestModal<ResultItem> {
   }
 
   async getSuggestions(query: string): Promise<ResultItem[]> {
-    // Flush any pending modifications before searching
     await this.indexer.flushDirty()
 
     if (!query.trim()) return []
 
-    const results = this.engine.search(query, this.settings.maxResults, this.contentStore)
+    const results = this.engine.search(query, this.settings, this.contentStore)
 
     return results.map((r) => {
       const file = this.app.vault.getAbstractFileByPath(r.path)
