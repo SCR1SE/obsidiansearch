@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-property-search",
+  "version": "0.1.0",
+  "description": "Obsidian plugin: unified search with frontmatter property display and PDF content search",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.21.5",
+    "obsidian": "latest",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "minisearch": "^7.1.0"
+  }
+}

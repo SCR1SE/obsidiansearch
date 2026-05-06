@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-property-search",
+  "name": "Property Search",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Search your vault with frontmatter property display and PDF content search via Text Extractor.",
+  "author": "obsidian-property-search contributors",
+  "authorUrl": "https://github.com/scr1se/obsidiansearch",
+  "isDesktopOnly": false
+}
